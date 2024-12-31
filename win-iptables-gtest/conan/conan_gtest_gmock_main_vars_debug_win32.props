@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="ConanVariables">
+    <Conangtest_gmock_mainRootFolder>C:/Users/27428/.conan2/p/b/gtest54362d1cc3571/p</Conangtest_gmock_mainRootFolder>
+    <Conangtest_gmock_mainBinaryDirectories></Conangtest_gmock_mainBinaryDirectories>
+    <Conangtest_gmock_mainCompilerFlags></Conangtest_gmock_mainCompilerFlags>
+    <Conangtest_gmock_mainLinkerFlags></Conangtest_gmock_mainLinkerFlags>
+    <Conangtest_gmock_mainPreprocessorDefinitions></Conangtest_gmock_mainPreprocessorDefinitions>
+    <Conangtest_gmock_mainIncludeDirectories>$(Conangtest_gmock_mainRootFolder)/include;</Conangtest_gmock_mainIncludeDirectories>
+    <Conangtest_gmock_mainResourceDirectories></Conangtest_gmock_mainResourceDirectories>
+    <Conangtest_gmock_mainLibraryDirectories>$(Conangtest_gmock_mainRootFolder)/lib;</Conangtest_gmock_mainLibraryDirectories>
+    <Conangtest_gmock_mainLibraries>gmock_main.lib;</Conangtest_gmock_mainLibraries>
+    <Conangtest_gmock_mainSystemLibs></Conangtest_gmock_mainSystemLibs>
+  </PropertyGroup>
+</Project>

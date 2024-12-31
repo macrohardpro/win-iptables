@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+	<ImportGroup Label="PropertySheets">
+		<Import Condition="'$(Configuration)' == 'Debug' And '$(Platform)' == 'x64'" Project="conan_gtest_gmock_debug_x64.props"/>
+		<Import Condition="'$(Configuration)' == 'Debug' And '$(Platform)' == 'Win32'" Project="conan_gtest_gmock_debug_win32.props"/>
+	</ImportGroup>
+	<PropertyGroup>
+		<conan_gtest_gmock_props_imported>True</conan_gtest_gmock_props_imported>
+	</PropertyGroup>
+</Project>

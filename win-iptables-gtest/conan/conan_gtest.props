@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+	<ImportGroup Label="PropertySheets">
+		<Import Condition="'$(conan_gtest_libgtest_props_imported)' != 'True'" Project="conan_gtest_libgtest.props"/>
+		<Import Condition="'$(conan_gtest_gtest_main_props_imported)' != 'True'" Project="conan_gtest_gtest_main.props"/>
+		<Import Condition="'$(conan_gtest_gmock_props_imported)' != 'True'" Project="conan_gtest_gmock.props"/>
+		<Import Condition="'$(conan_gtest_gmock_main_props_imported)' != 'True'" Project="conan_gtest_gmock_main.props"/>
+	</ImportGroup>
+	<PropertyGroup>
+		<conan_gtest_props_imported>True</conan_gtest_props_imported>
+	</PropertyGroup>
+</Project>
