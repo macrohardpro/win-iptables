@@ -1,101 +1,183 @@
-# win_iptables
-A Windows version of iptables implemented based on WinDivert
+# winiptables
 
-# Roadmap
+[中文文档](README.zh.md) | English
 
-## README.md
-- [简体中文](README_CN.md)
+A Windows port of Linux iptables, built on [WinDivert](https://reqrypt.org/windivert.html).  
+Manage network traffic on Windows using the same `iptables` syntax you already know.
 
-## Technology Stack
+---
 
-- **Programming Languages:**
-  - C/C++: Using C++17 standard.
-  - Python: auxiliary tools.
+## Features
 
-- **Libraries and Frameworks:**
-  - PortBender: Core packet filtering library, used to implement rule matching and traffic control.
-  - Windows API: For interacting with the operating system, such as creating services, managing processes, etc.
+- `iptables`-compatible CLI — `-A`, `-I`, `-D`, `-L`, `-F`, `-Z`, `-N`, `-X`, `-P`, `-E`
+- `filter`, `nat`, `mangle` tables with standard built-in chains
+- Match conditions: `-p`, `-s`, `-d`, `-i`, `-o`, `--sport`, `--dport`, `--tcp-flags`, `--icmp-type`, `-m multiport`, `-m state`
+- Targets: `ACCEPT`, `DROP`, `REJECT`, `RETURN`, `LOG`, `JUMP`, `MASQUERADE`, `DNAT`, `SNAT`
+- Rule persistence (`iptables-save` / `iptables-restore` compatible format)
+- Per-rule packet/byte counters (`-L -v`)
+- Stateful connection tracking (`-m state --state NEW,ESTABLISHED,...`)
+- Runs as a Windows Service — starts automatically with the system
+- CLI communicates with the service over a Named Pipe
 
-- **Build Tools:**
-  - CMake: Cross-platform build system generator, used for configuring and compiling the project.
-  - MSBuild: The default build system when compiling projects using Visual Studio.
-  - Conan: Cross-platform C++ package manager
+---
 
-- **Version Control System:**
-  - Git: Distributed version control system for code version management and collaborative development.
+## Architecture
 
-- **Testing Frameworks:**
-  - Google Test: Unit testing framework for C++.
+```
+winiptables.exe (CLI)
+    └── Named Pipe ──► winiptables-svc.exe (Service)
+                            ├── CommandDispatcher → RuleStore
+                            ├── TablePipeline (raw→mangle→nat→filter)
+                            ├── RuleEngine
+                            └── PacketCapture (WinDivert)
+```
 
-- **Continuous Integration/Continuous Deployment (CI/CD):**
-  - GitHub Actions: Automates the build, test, and deployment process.
+---
 
-## Rule Management
+## Requirements
 
-- [ ] Basic Rule Operations
-  - [ ] Add Rule
-  - [ ] Remove Rule
-  - [ ] Modify Existing Rule
-  
-- [ ] Chain Management
-  - [ ] Create Custom Chains
-  - [ ] Insert Rules into Specific Chains
-  - [ ] Set Chain Policies
+- Windows 10 / Server 2016 or later (x64)
+- Administrator privileges (WinDivert requires kernel driver access)
+- Visual Studio 2022 / 2026 with "Desktop development with C++" workload
+- CMake ≥ 3.20
 
-- [ ] Predefined Rule Sets
-  - [ ] Allow All Traffic
-  - [ ] Deny All Traffic
-  - [ ] Common Security Configuration Templates
+All third-party dependencies (`WinDivert`, `GoogleTest`) are bundled under `third_party/` — no internet access needed to build.
 
-## Logging and Monitoring
+---
 
-- [ ] Real-time Log Viewing
-  - [ ] Display Logs for Matching Rules Traffic
-  - [ ] Filter and Search Log Entries
+## Quick Start
 
-- [ ] Traffic Statistics
-  - [ ] Network Connections Statistics
-  - [ ] Data Transfer Volume Monitoring
+### 1. Build
 
-- [ ] Alert System
-  - [ ] Custom Trigger Conditions
-  - [ ] Notification Methods (Pop-ups, Emails, etc.)
+```powershell
+# Configure
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64
 
-## User Interface
+# Build Release
+cmake --build build --config Release
+```
 
-- [ ] Command Line Interface (CLI)
-  - [ ] Support for Common iptables Commands
-  - [ ] Interactive Help Documentation
+Or use the packaging script which builds and bundles everything automatically:
 
-- [ ] Graphical User Interface (GUI)
-  - [ ] Visual Rule Editor
-  - [ ] Status Panel and Dashboard
+```powershell
+.\package.ps1
+```
 
-## Documentation and Support
+### 2. Install the service
 
-- [ ] Online Help and Tutorials
-  - [ ] Quick Start Guide
-  - [ ] Detailed User Manual
+> All commands below require an **Administrator** PowerShell prompt.
 
-- [ ] Community Forum and FAQ
-  - [ ] User Exchange Platform
-  - [ ] Solve Common Issues
+```powershell
+# Install and register the Windows service
+.\build\bin\Release\winiptables-svc.exe install
 
-## Testing and Validation
+# Start the service
+.\build\bin\Release\winiptables.exe service start
+```
 
-- [ ] Automated Test Suite
-  - [ ] Unit Testing
-  - [ ] Integration Testing
+### 3. Add rules
 
-- [ ] User Feedback Loop
-  - [ ] Beta Version Releases
-  - [ ] Collect Improvement Suggestions
+```powershell
+# Allow inbound TCP on port 80
+winiptables.exe -A INPUT -p tcp --dport 80 -j ACCEPT
 
-## Release and Updates
+# Allow inbound TCP on port 443
+winiptables.exe -A INPUT -p tcp --dport 443 -j ACCEPT
 
-- [ ] Version Control
-  - [ ] Regular Updates
-  - [ ] Rollback Mechanism
+# Drop all other inbound traffic
+winiptables.exe -P INPUT DROP
 
-- [ ] Multilingual Support
-  - [ ] Internationalization and Localization
+# List rules
+winiptables.exe -L -n -v
+```
+
+### 4. Save and restore rules
+
+```powershell
+# Save current ruleset to file
+winiptables.exe save > rules.v4
+
+# Restore on next boot (or after a flush)
+winiptables.exe restore < rules.v4
+```
+
+### 5. Stop and uninstall
+
+```powershell
+winiptables.exe service stop
+winiptables-svc.exe uninstall
+```
+
+---
+
+## Console Mode (no service install)
+
+Useful for testing and debugging — runs the packet filter directly in the terminal:
+
+```powershell
+# Requires Administrator
+.\build\bin\Debug\winiptables-svc.exe --console
+```
+
+Press `Ctrl+C` to stop.
+
+---
+
+## Deploy to another machine
+
+Use `package.ps1` to bundle the executables, WinDivert runtime, and MSVC CRT into a single directory that runs on a clean machine with no dependencies:
+
+```powershell
+.\package.ps1                  # Release build + package
+.\package.ps1 -Config Debug    # Debug build + package
+.\package.ps1 -NoBuild         # Package existing build artifacts
+```
+
+Output goes to `dist\winiptables\`. Copy the entire folder to the target machine and follow the steps in [Quick Start](#quick-start).
+
+---
+
+## Run Tests
+
+```powershell
+# Build and run all unit tests (Debug)
+.\run-tests.ps1
+
+# Release build
+.\run-tests.ps1 -Config Release
+
+# Skip build, run existing binaries
+.\run-tests.ps1 -NoBuild
+
+# Filter by suite name
+.\run-tests.ps1 -Filter "test_rule*"
+```
+
+XML reports are written to `test-results/`.
+
+---
+
+## Project Structure
+
+```
+winiptables/
+├── include/winiptables/    # Public headers (model, interfaces, components)
+├── src/
+│   ├── core/               # Shared static library (rule engine, packet capture, ...)
+│   ├── cli/                # CLI executable (winiptables.exe)
+│   └── service/            # Service executable (winiptables-svc.exe)
+├── tests/                  # GoogleTest unit tests
+├── third_party/            # Bundled dependencies (WinDivert, GoogleTest)
+├── cmake/                  # CMake find modules
+├── BUILD.md                # Detailed build instructions
+├── package.ps1             # Build + package script
+└── run-tests.ps1           # Build + test script
+```
+
+See [BUILD.md](BUILD.md) for detailed build, test, and deployment instructions.
+
+---
+
+## License
+
+MIT
