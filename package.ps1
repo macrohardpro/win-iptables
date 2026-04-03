@@ -1,6 +1,7 @@
 # package.ps1 — winiptables packaging script
 # Bundles build artifacts, WinDivert runtime, and MSVC CRT into a standalone
 # directory that can be deployed to a clean machine without any dependencies.
+# Optionally builds an Inno Setup installer from the packaged files.
 #
 # Usage:
 #   .\package.ps1                      # Build Release then package (default)
@@ -9,16 +10,33 @@
 #   .\package.ps1 -NoBuild             # Skip build, package existing artifacts
 #   .\package.ps1 -WithTests           # Also build unit tests (excluded by default)
 #   .\package.ps1 -NoBuild -WithTests  # Skip build but include existing test binaries
+#   .\package.ps1 -MakeInstaller       # Also produce an Inno Setup installer EXE
+#   .\package.ps1 -NoBuild -MakeInstaller  # Package + installer, skip build
+#   .\package.ps1 -Rebuild             # Clean build directory before building (full rebuild)
 
 param(
     [string]$Config    = "Release",
     [string]$OutDir    = "dist\winiptables",
     [switch]$NoBuild,
-    [switch]$WithTests
+    [switch]$Rebuild,
+    [switch]$WithTests,
+    [switch]$MakeInstaller
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+# ── Version ───────────────────────────────────────────────────────────────────
+
+$VersionFile = Join-Path $PSScriptRoot "version.txt"
+if (-not (Test-Path $VersionFile)) {
+    Write-Error "version.txt not found: $VersionFile"
+}
+$AppVersion = (Get-Content $VersionFile -Raw).Trim()
+if ($AppVersion -notmatch '^\d+\.\d+\.\d+') {
+    Write-Error "Invalid version format in version.txt: '$AppVersion' (expected X.Y.Z)"
+}
+Write-Host "Version: $AppVersion" -ForegroundColor Gray
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -35,6 +53,11 @@ if ($NoBuild) {
     Write-Host "[1/5] Skipping build (-NoBuild)" -ForegroundColor Yellow
 } else {
     Write-Host "[1/5] Building ($Config)..." -ForegroundColor Cyan
+
+    if ($Rebuild -and (Test-Path $BuildDir)) {
+        Write-Host "  Cleaning build directory (-Rebuild)..." -ForegroundColor Gray
+        Remove-Item $BuildDir -Recurse -Force
+    }
 
     if (-not (Test-Path $BuildDir)) {
         Write-Host "  Running cmake configure..." -ForegroundColor Gray
@@ -169,7 +192,7 @@ foreach ($p in $UcrtPaths) {
 # ── Generate README ───────────────────────────────────────────────────────────
 
 $ReadmeContent = @"
-winiptables $Config Release Package
+winiptables $AppVersion $Config Package
 =====================================
 
 Files
@@ -214,3 +237,35 @@ Write-Host "Output: $Dest" -ForegroundColor Green
 Write-Host ""
 
 Get-ChildItem $Dest | Format-Table Name, Length -AutoSize
+
+# ── Step 6: Build Inno Setup installer (optional) ─────────────────────────────
+
+if ($MakeInstaller) {
+    Write-Host "[6/6] Building installer..." -ForegroundColor Cyan
+
+    $IssFile = Join-Path $ScriptDir "installer\winiptables.iss"
+    if (-not (Test-Path $IssFile)) {
+        Write-Error "Inno Setup script not found: $IssFile"
+    }
+
+    # Locate ISCC.exe
+    $Iscc = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
+    if (-not $Iscc) {
+        $Iscc = Get-Item "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
+        if (-not $Iscc) {
+            Write-Error "ISCC.exe not found. Please install Inno Setup 6 from https://jrsoftware.org/isinfo.php"
+        }
+        $IsccPath = $Iscc.FullName
+    } else {
+        $IsccPath = $Iscc.Source
+    }
+
+    Write-Host "  Using ISCC: $IsccPath" -ForegroundColor Gray
+
+    & $IsccPath /DAppVersion="$AppVersion" $IssFile
+    if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compile failed" }
+
+    $SetupExe = Join-Path $ScriptDir "dist\winiptables-$AppVersion-setup.exe"
+    Write-Host ""
+    Write-Host "Installer ready: $SetupExe" -ForegroundColor Green
+}

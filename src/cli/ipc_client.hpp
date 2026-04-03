@@ -1,5 +1,5 @@
 #pragma once
-// ipc_client.hpp — IpcClient declaration (Task 12.2)
+// ipc_client.hpp — IpcClient declaration
 
 #include <string>
 #include <vector>
@@ -17,24 +17,21 @@ struct IpcResponse {
 
 class IpcClient {
 public:
-    // Sends argv over a named pipe and returns the service response
-    // If connection fails, response.error is non-empty
+    // Sends argv over a named pipe and returns the service response.
+    // If connection fails, response.error is non-empty.
     static IpcResponse send(const std::vector<std::string>& argv);
 
 private:
     static constexpr const char* kPipeName = R"(\\.\pipe\winiptables)";
 
-    // Generates a unique request ID (simple counter)
+    // Generates a unique request ID (atomic counter)
     static std::string generate_id();
 
-    // JSON string escaping
-    static std::string json_escape(const std::string& s);
-
-    // Build JSON Lines request
+    // Build JSON Lines request: {"id":"...","argv":[...]}
     static std::string build_request(const std::string& id,
                                      const std::vector<std::string>& argv);
 
-    // Parse JSON Lines response
+    // Parse JSON Lines response line into IpcResponse
     static IpcResponse parse_response(const std::string& line);
 };
 

@@ -10,6 +10,7 @@ add_executable(winiptables-svc
 target_include_directories(winiptables-svc
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_SOURCE_DIR}/third_party/json/single_include"
 )
 
 target_link_libraries(winiptables-svc

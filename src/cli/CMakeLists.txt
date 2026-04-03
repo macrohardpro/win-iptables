@@ -8,6 +8,7 @@ add_executable(winiptables
 
 target_include_directories(winiptables PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    "${CMAKE_SOURCE_DIR}/third_party/json/single_include"
 )
 
 target_link_libraries(winiptables
