@@ -51,7 +51,7 @@ function Find-VsInstall {
     }
 
     if (Test-Path $vswhere) {
-        $json = & $vswhere -latest -products * `
+        $json = & $vswhere -latest -prerelease -products * `
             -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
             -format json 2>$null | ConvertFrom-Json
         if ($json -and $json.Count -gt 0) {
@@ -66,7 +66,7 @@ function Find-VsInstall {
     }
 
     # Fallback: scan known paths for VS2026 (18) then VS2022 (17)
-    $editions = @("Enterprise", "Professional", "Community", "BuildTools")
+    $editions = @("Enterprise", "Professional", "Community", "BuildTools", "Insiders", "Preview")
     foreach ($major in @(18, 17)) {
         foreach ($ed in $editions) {
             $root = "C:\Program Files\Microsoft Visual Studio\$major\$ed"
@@ -91,7 +91,7 @@ if ($VsVersion -ne "") {
     $wantedMajor = @{ "2022" = 17; "2026" = 18 }[$VsVersion]
     if ($VsInstall.MajorVersion -ne $wantedMajor) {
         # Auto-detect returned a different version — try to find the requested one directly
-        $editions = @("Enterprise", "Professional", "Community", "BuildTools")
+        $editions = @("Enterprise", "Professional", "Community", "BuildTools", "Insiders", "Preview")
         $found = $null
         foreach ($ed in $editions) {
             $root = "C:\Program Files\Microsoft Visual Studio\$wantedMajor\$ed"
