@@ -70,9 +70,20 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
     Rule rule;
     Target target;
     bool has_target = false;
+    bool next_negated = false;  // set by a standalone "!" token
 
     for (size_t i = 0; i < rule_args.size(); ++i) {
         const std::string& arg = rule_args[i];
+
+        // Standalone "!" before an option: "! -p tcp"
+        if (arg == "!") {
+            next_negated = true;
+            continue;
+        }
+
+        // Consume the pending negation flag for this token
+        bool negated = next_negated;
+        next_negated = false;
 
         // ── Target ──────────────────────────────────────────────────────────
         if (arg == "-j" || arg == "--jump") {
@@ -97,7 +108,7 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
 
         // REJECT --reject-with
         if (arg == "--reject-with" && has_target && target.kind == Target::Kind::kReject) {
-            if (i + 1 < rule_args.size()) ++i;  // consume but ignore for now
+            if (i + 1 < rule_args.size()) ++i;
             continue;
         }
 
@@ -111,17 +122,12 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
 
         // ── Match conditions ─────────────────────────────────────────────────
 
-        // -p protocol
+        // -p protocol  (also supports "-p ! tcp" inline negation)
         if (arg == "-p" || arg == "--protocol") {
             if (i + 1 >= rule_args.size()) { err = "-p requires an argument"; return rule; }
-            bool negated = false;
             std::string proto = rule_args[++i];
-            if (proto == "!") {
-                negated = true;
-                if (i + 1 < rule_args.size()) proto = rule_args[++i];
-            }
-            rule.matches.push_back(
-                std::make_unique<ProtocolMatch>(ParseProtocol(proto), negated));
+            if (proto == "!") { negated = !negated; if (i + 1 < rule_args.size()) proto = rule_args[++i]; }
+            rule.matches.push_back(std::make_unique<ProtocolMatch>(ParseProtocol(proto), negated));
             continue;
         }
 
@@ -129,15 +135,10 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
         if (arg == "-s" || arg == "--source") {
             if (i + 1 >= rule_args.size()) { err = "-s requires an argument"; return rule; }
             std::string cidr = rule_args[++i];
-            bool negated = false;
-            if (cidr == "!") {
-                negated = true;
-                if (i + 1 < rule_args.size()) cidr = rule_args[++i];
-            }
+            if (cidr == "!") { negated = !negated; if (i + 1 < rule_args.size()) cidr = rule_args[++i]; }
             try {
                 auto r = ParseCidr(cidr);
-                rule.matches.push_back(
-                    std::make_unique<SrcIpMatch>(r.network_be, r.prefix_len, negated));
+                rule.matches.push_back(std::make_unique<SrcIpMatch>(r.network_be, r.prefix_len, negated));
             } catch (...) { err = "Invalid source IP: " + cidr; return rule; }
             continue;
         }
@@ -146,15 +147,10 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
         if (arg == "-d" || arg == "--destination") {
             if (i + 1 >= rule_args.size()) { err = "-d requires an argument"; return rule; }
             std::string cidr = rule_args[++i];
-            bool negated = false;
-            if (cidr == "!") {
-                negated = true;
-                if (i + 1 < rule_args.size()) cidr = rule_args[++i];
-            }
+            if (cidr == "!") { negated = !negated; if (i + 1 < rule_args.size()) cidr = rule_args[++i]; }
             try {
                 auto r = ParseCidr(cidr);
-                rule.matches.push_back(
-                    std::make_unique<DstIpMatch>(r.network_be, r.prefix_len, negated));
+                rule.matches.push_back(std::make_unique<DstIpMatch>(r.network_be, r.prefix_len, negated));
             } catch (...) { err = "Invalid destination IP: " + cidr; return rule; }
             continue;
         }
@@ -162,12 +158,8 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
         // -i in-interface
         if (arg == "-i" || arg == "--in-interface") {
             if (i + 1 >= rule_args.size()) { err = "-i requires an argument"; return rule; }
-            bool negated = false;
             std::string iface = rule_args[++i];
-            if (iface == "!") {
-                negated = true;
-                if (i + 1 < rule_args.size()) iface = rule_args[++i];
-            }
+            if (iface == "!") { negated = !negated; if (i + 1 < rule_args.size()) iface = rule_args[++i]; }
             rule.matches.push_back(std::make_unique<InIfaceMatch>(0, negated));
             continue;
         }
@@ -175,12 +167,8 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
         // -o out-interface
         if (arg == "-o" || arg == "--out-interface") {
             if (i + 1 >= rule_args.size()) { err = "-o requires an argument"; return rule; }
-            bool negated = false;
             std::string iface = rule_args[++i];
-            if (iface == "!") {
-                negated = true;
-                if (i + 1 < rule_args.size()) iface = rule_args[++i];
-            }
+            if (iface == "!") { negated = !negated; if (i + 1 < rule_args.size()) iface = rule_args[++i]; }
             rule.matches.push_back(std::make_unique<OutIfaceMatch>(0, negated));
             continue;
         }
@@ -189,11 +177,7 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
         if (arg == "--dport" || arg == "--destination-port") {
             if (i + 1 >= rule_args.size()) { err = "--dport requires an argument"; return rule; }
             std::string port = rule_args[++i];
-            bool negated = false;
-            if (port == "!") {
-                negated = true;
-                if (i + 1 < rule_args.size()) port = rule_args[++i];
-            }
+            if (port == "!") { negated = !negated; if (i + 1 < rule_args.size()) port = rule_args[++i]; }
             auto [lo, hi] = ParsePortRange(port);
             rule.matches.push_back(std::make_unique<DstPortMatch>(lo, hi, negated));
             continue;
@@ -203,24 +187,64 @@ Rule BuildRule(const std::vector<std::string>& rule_args, std::string& err) {
         if (arg == "--sport" || arg == "--source-port") {
             if (i + 1 >= rule_args.size()) { err = "--sport requires an argument"; return rule; }
             std::string port = rule_args[++i];
-            bool negated = false;
-            if (port == "!") {
-                negated = true;
-                if (i + 1 < rule_args.size()) port = rule_args[++i];
-            }
+            if (port == "!") { negated = !negated; if (i + 1 < rule_args.size()) port = rule_args[++i]; }
             auto [lo, hi] = ParsePortRange(port);
             rule.matches.push_back(std::make_unique<SrcPortMatch>(lo, hi, negated));
             continue;
         }
 
-        // -m match extension (module name consumed; options handled by specific args above)
+        // -m match extension (consume module name; options follow as separate tokens)
         if (arg == "-m" || arg == "--match") {
             if (i + 1 < rule_args.size()) ++i;
             continue;
         }
 
-        // Standalone negation prefix
-        if (arg == "!") {
+        // --tcp-flags <mask> <comp>
+        if (arg == "--tcp-flags") {
+            if (i + 2 >= rule_args.size()) { err = "--tcp-flags requires two arguments"; return rule; }
+            std::string mask_str = rule_args[++i];
+            if (mask_str == "!") { negated = !negated; if (i + 2 >= rule_args.size()) { err = "--tcp-flags requires two arguments"; return rule; } mask_str = rule_args[++i]; }
+            const std::string& comp_str = rule_args[++i];
+            try {
+                uint8_t mask = TcpFlagsMatch::ParseFlags(mask_str);
+                uint8_t comp = TcpFlagsMatch::ParseFlags(comp_str);
+                rule.matches.push_back(std::make_unique<TcpFlagsMatch>(mask, comp, negated));
+            } catch (const std::exception& e) { err = e.what(); return rule; }
+            continue;
+        }
+
+        // --icmp-type <type>
+        if (arg == "--icmp-type") {
+            if (i + 1 >= rule_args.size()) { err = "--icmp-type requires an argument"; return rule; }
+            std::string type_str = rule_args[++i];
+            if (type_str == "!") { negated = !negated; if (i + 1 >= rule_args.size()) { err = "--icmp-type requires an argument"; return rule; } type_str = rule_args[++i]; }
+            try {
+                uint8_t icmp_type = static_cast<uint8_t>(std::stoi(type_str));
+                rule.matches.push_back(std::make_unique<IcmpTypeMatch>(icmp_type, negated));
+            } catch (...) { err = "Invalid icmp-type: " + type_str; return rule; }
+            continue;
+        }
+
+        // --sports / --dports (multiport extension)
+        if (arg == "--sports" || arg == "--dports") {
+            if (i + 1 >= rule_args.size()) { err = arg + " requires an argument"; return rule; }
+            std::string ports = rule_args[++i];
+            if (ports == "!") { negated = !negated; if (i + 1 >= rule_args.size()) { err = arg + " requires an argument"; return rule; } ports = rule_args[++i]; }
+            bool is_src = (arg == "--sports");
+            try {
+                rule.matches.push_back(MultiportMatch::Parse(ports, is_src, negated));
+            } catch (const std::exception& e) { err = e.what(); return rule; }
+            continue;
+        }
+
+        // --state (state extension)
+        if (arg == "--state") {
+            if (i + 1 >= rule_args.size()) { err = "--state requires an argument"; return rule; }
+            std::string states = rule_args[++i];
+            if (states == "!") { negated = !negated; if (i + 1 >= rule_args.size()) { err = "--state requires an argument"; return rule; } states = rule_args[++i]; }
+            try {
+                rule.matches.push_back(StateMatch::Parse(states, negated));
+            } catch (const std::exception& e) { err = e.what(); return rule; }
             continue;
         }
     }

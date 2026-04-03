@@ -39,12 +39,12 @@ public:
     static std::future<bool> save_async(const RuleStore& store,
                                         const std::string& path);
 
-private:
     // Serialize a single table to iptables-save format, append to out
     static void serialize_table(const RuleStore& store, TableKind kind,
                                  const std::string& table_name,
                                  std::string& out);
 
+private:
     // Serialize Target to "-j TARGET [args]" string
     static std::string target_to_text(const Target& target);
 };

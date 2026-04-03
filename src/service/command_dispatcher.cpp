@@ -274,21 +274,25 @@ int CommandDispatcher::dispatch(const std::vector<std::string>& argv,
     int rule_num = 0;
     std::vector<std::string> rule_args;
     bool numeric = false, verbose = false, line_numbers = false;
-    bool is_save = false, is_restore = false, noflush = false;
+    bool noflush = false;
     std::string file_path;
 
     // Parse arguments
     for (size_t i = 0; i < argv.size(); ++i) {
         const std::string& arg = argv[i];
 
-        if ((arg == "-t" || arg == "--table") && i + 1 < argv.size()) {
-            table_name = argv[++i];
+        if (arg == "-t" || arg == "--table") {
+            if (i + 1 < argv.size()) table_name = argv[++i];
             continue;
         }
         if (arg == "-n" || arg == "--numeric") { numeric = true; continue; }
         if (arg == "-v" || arg == "--verbose") { verbose = true; continue; }
         if (arg == "--line-numbers") { line_numbers = true; continue; }
         if (arg == "--noflush") { noflush = true; continue; }
+        if ((arg == "-f" || arg == "--file") && i + 1 < argv.size()) {
+            file_path = argv[++i];
+            continue;
+        }
 
         if (verb.empty()) {
             auto is_num = [](const std::string& s) {
@@ -365,8 +369,12 @@ int CommandDispatcher::dispatch(const std::vector<std::string>& argv,
                 if (i + 1 < argv.size()) rule_args.push_back(argv[++i]);
                 continue;
             }
-            if (arg == "save") { is_save = true; verb = "save"; continue; }
-            if (arg == "restore") { is_restore = true; verb = "restore"; continue; }
+            if (arg == "save" || arg == "iptables-save") {
+                verb = "save"; continue;
+            }
+            if (arg == "restore" || arg == "iptables-restore") {
+                verb = "restore"; continue;
+            }
         } else {
             rule_args.push_back(arg);
         }
@@ -383,6 +391,14 @@ int CommandDispatcher::dispatch(const std::vector<std::string>& argv,
     // -L: list rules
     if (verb == "-L") {
         format_chain_list(table, chain_name, numeric, verbose, line_numbers, stdout_out);
+        return 0;
+    }
+
+    // -S: list rules in rule-spec form (iptables-save style, single table)
+    if (verb == "-S") {
+        std::string content;
+        RulePersist::serialize_table(store_, table, table_name, content);
+        stdout_out = content;
         return 0;
     }
 
